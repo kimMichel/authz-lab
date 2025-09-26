@@ -1,4 +1,4 @@
-name: Release: attach SBOM
+name: Release attach SBOM
 
 on:
   release:

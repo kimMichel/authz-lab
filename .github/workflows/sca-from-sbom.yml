@@ -1,40 +1,32 @@
 name: SCA from SBOM (OSV → Code scanning)
+on: [push, pull_request]
 
-on:
-  push:
-    branches: [ "**" ]
-  pull_request:
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   osv_from_sbom:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write  # allows uploading results to Code scanning
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - run: npm ci
+      - run: npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom.cdx.json
+
+      # Use the official reusable workflow to scan current repo,
+      # but override to scan your SBOM artifact only:
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          name: sbom-cdx
+          path: sbom.cdx.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate SBOM (CycloneDX JSON)
-        run: npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom.cdx.json
-
-      - name: Run OSV-Scanner against SBOM
-        uses: google/osv-scanner-action@v1
+      - name: OSV scan (reusable workflow, download our SBOM)
+        uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.2
         with:
-          scan-args: >-
-            --sbom=sbom.cdx.json
-            --format=sarif
-            --output=osv.sarif
-
-      - name: Upload SARIF to Code scanning
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: osv.sarif
+          download-artifact: sbom-cdx
+          scan-args: |-
+            --lockfile=cyclonedx:sbom.cdx.json   # tell OSV the file type & path
