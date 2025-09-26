@@ -2,45 +2,24 @@ name: SCA (OSV + Dependency Review)
 
 on:
   push:
-    branches: [ "**" ]
+    branches: ["**"]
   pull_request:
 
 permissions:
   contents: read
-  security-events: write
-  pull-requests: write
+  security-events: write     # allow uploading SARIF
+  pull-requests: write       # for dependency-review gate
 
 jobs:
-  osv:
-    name: OSV scan (lockfiles/manifests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-      - run: npm ci
-
-      # Use OSV reusable workflow (v2.x) to scan repo
-      - name: OSV scan
-        uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.2
-
-      # Optional: also upload SARIF to Code scanning (OSV emits SARIF by default)
-      - name: Upload SARIF
-        if: hashFiles('**/osv-scanner.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: osv-scanner.sarif
+  osv-scan:
+    # ✅ call the reusable workflow here (top-level 'uses')
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.2
 
   dependency-review:
-    name: PR dependency gate
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Dependency Review (fail on high)
+      - name: Dependency Review (fail on High)
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
