@@ -1,0 +1,38 @@
+name: SBOM (CycloneDX artifact)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Optional: install deps to ensure node_modules exists (helps cyclonedx-npm)
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+
+      # Generate CycloneDX JSON SBOM for the repo
+      - name: Generate SBOM (CycloneDX JSON)
+        run: npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom.cdx.json
+
+      # Store the SBOM as an artifact you can download from the Actions UI
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
